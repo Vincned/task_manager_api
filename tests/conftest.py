@@ -1,31 +1,35 @@
+# настраивает тестовую среду ОДИН РАЗ для всех тестов
+
+# 👉 сюда выносят:
+# * фикстуры
+# * подготовку БД
+# * подмену зависимостей
+# * TestClient
+
 import pytest
-from sqlalchemy.orm import Session
+from fastapi.testclient import TestClient
 
 from app.main import app
-from app.db.database import Base
-from tests.database import engine, TestingSessionLocal
+from app.db.database import Base, engine, SessionLocal, get_db
+
 
 # создаём таблицы перед тестами
 Base.metadata.create_all(bind=engine)
 
-
-# override get_db
+# override DB dependency
 def override_get_db():
-    db = TestingSessionLocal()
+    db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
 
-
-# подключаем override
-from app.db.database import get_db
+# подмена на тестовую базу, вместо реальной
 app.dependency_overrides[get_db] = override_get_db
 
-
-# фикстура клиента
-from fastapi.testclient import TestClient
-
+# test client
+# фейковый браузер, позволяет работать без запуска сервера
 @pytest.fixture
 def client():
-    return TestClient(app)
+    with TestClient(app) as c:
+        yield c
